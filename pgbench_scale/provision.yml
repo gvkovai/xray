@@ -1,0 +1,50 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+
+  tasks:
+  - name: Copy debian packages tar file to apt archive directory 
+    copy:
+       src: postgres.tar.gz
+       dest: /var/cache/apt/archives/ 
+       owner: root
+       group: root
+       mode: '0777'
+  - name: extract deb files from tar file that was copied into the apt archive dir
+    shell: tar -xvzf postgres.tar.gz 
+    args:
+      chdir: "/var/cache/apt/archives/"
+  - name: Install Postgres and other Debian packages using deb files that were copied into the apt archive dir
+    shell: dpkg -i *.deb 
+    args:
+      chdir: "/var/cache/apt/archives/"
+
+- hosts: all
+  become: yes
+  become_user: postgres
+  gather_facts: no
+
+  vars:
+    dbuser: nutanix
+    dbpassword: nutanix/4u
+
+  tasks:
+  - name: Create test database
+    postgresql_db: name={{dbname}}
+
+  - name: Ensure user has access to database
+    postgresql_user: db={{dbname}} name={{dbuser}} password={{dbpassword}} priv=ALL
+
+- hosts: all
+  become: yes
+  become_user: nutanix
+  gather_facts: no
+
+  tasks:
+  - name: Prepare pgbench
+    shell: pgbench -i -s {{pgbench_scale}} {{dbname}}
+    register: pgbenchout
+  - debug: msg="{{ pgbenchout.stdout }}"
+
+

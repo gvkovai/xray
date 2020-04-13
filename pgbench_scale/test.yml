@@ -1,0 +1,155 @@
+name: pg_sql_bench_scale
+
+display_name: "Postgres SQL Benchmark Scale"
+
+summary: |
+  Scalable, pgbench benchmark scenario distributing a workload
+  across VMs.
+
+description: |
+  <strong>What's this test about?</strong><br/>
+  This test allows for the pgbench execution on one or more virtual machines. 
+   Many pgbench benchmark parameters can be adjusted, including the scale, clients, 
+   jobs and the transactions. VMs will be evenly distributed across the nodes
+   in the cluster and pgbench is run in all the VMs using the given parameters.
+   In this version we use the "Simple" PGbench mode in which only the select transaction
+   types are executed.  By using only the simple transactions and a small workingset
+   this workload exercises CPU and memory.
+  <br/><br/>
+  <strong>How to measure the infrastructure's raw performance?</strong><br/>
+  The performance is evaluated by measuring the transactions, throughput and 
+  latency of the workload.
+  <br/><br/>
+  <strong>How is the test run?</strong><br/>
+  Setup
+  <ol>
+    <li>Deploy the desired number of workload VMs per host.</li>
+    <li>Run pgbench on each of the VM.</li>
+  </ol>
+  Measurement
+  <ol>
+    <li>Run the desired database transactions per pgbench client.</li>
+  </ol>
+
+
+tags:
+  - performance
+  - day_0
+
+vars:
+  AA_max_num_db_instances:
+    default: 20
+    display_name: "Max Number of DB instances"
+    min: 1
+  AB_num_db_step:
+    default: 4
+    display_name: "Number of DB instances increased per step"
+    min: 1
+  AC_vcpu_per_db:
+    default: 4
+    display_name: "vCPU per DB instance"
+    min: 2
+  B_pgbench_scale:
+    default: 10
+    display_name: "Scale Factor"
+    min: 10
+  C_pgbench_clients:
+    default: 10
+    display_name: "Number of clients simulated, that is, number of concurrent database sessions"
+    min: 1
+  E_pgbench_jobs:
+    default: 10
+    display_name: "Number of worker threads within pgbench client"
+    min: 1
+
+estimated_runtime: 300
+
+vms:
+  - pgvms:
+      template: ubuntu1604
+      vcpus: {{ AC_vcpu_per_db }}
+      ram_mb: 8192
+      data_disks:
+        count: 1
+        size: 16
+      count_per_cluster: {{ AA_max_num_db_instances }}
+      exporter_ports:
+        - 9100
+        - 9187
+
+workloads: []
+
+results: 
+  - "DB Transactions (sum)":
+      vm_group: pgvms
+      result_hint: "Higher transactions indicates better performance."
+      result_type: generic
+      aggregate: sum
+      query: |
+        irate(
+          pg_stat_database_xact_commit{
+            datname="xraypgb",
+            __curie_filter_scenario__,
+            __curie_filter_vm_group__
+          }
+        [30s]) + 
+        irate(
+          pg_stat_database_xact_rollback{
+            datname="xraypgb",
+            __curie_filter_scenario__,
+            __curie_filter_vm_group__
+          }
+        [30s])
+  - Cluster CPU Usage:
+      metric: CpuUsage.Avg.Megahertz
+      aggregate: sum
+
+setup:
+  - cluster.CleanUp: {}
+  - vm_group.CloneFromTemplate:
+      vm_group_name: pgvms
+  - vm_group.PowerOn:
+      vm_group_name: pgvms
+  - playbook.Run:
+      filename: provision.yml
+      forks: 99
+      inventory:
+        - pgvms
+      variables:
+        dbname: xraypgb
+        pgbench_scale: {{ B_pgbench_scale }}
+      remote_user: root
+      remote_pass: nutanix/4u
+  - playbook.Run:
+      filename: setup_postgres_exporter.yml
+      forks: 99
+      inventory:
+        - pgvms
+      variables:
+        dbname: xraypgb
+      remote_user: root
+      remote_pass: nutanix/4u
+
+run:
+{% for step_index in range(AB_num_db_step, AA_max_num_db_instances+AB_num_db_step, AB_num_db_step) %}
+  - playbook.Run:
+      filename: run-pgbench.yml
+      forks: 199
+      inventory:
+        - pgvms
+      variables:
+        dbname: xraypgb
+        pgbench_scale: {{ B_pgbench_scale }}
+        pgbench_clients: {{ C_pgbench_clients }}
+        pgbench_jobs: {{ E_pgbench_jobs }}
+        e_index: {{ step_index }}
+      remote_user: root
+      remote_pass: nutanix/4u
+      annotate: True
+  - test.Wait:
+      duration_secs: 10
+{% endfor %}
+
+teardown:
+  - test.Wait:
+      duration_secs: 10
