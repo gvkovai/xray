@@ -1,0 +1,135 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+
+  tasks:
+  - name: Copy debian packages tar file to apt archive directory 
+    copy:
+       src: postgres.tar.gz
+       dest: /var/cache/apt/archives/ 
+       owner: root
+       group: root
+       mode: '0777'
+  - name: extract deb files from tar file that was copied into the apt archive dir
+    shell: tar -xvzf postgres.tar.gz 
+    args:
+      chdir: "/var/cache/apt/archives/"
+  - name: Install Postgres and other Debian packages using deb files that were copied into the apt archive dir
+    shell: dpkg -i *.deb 
+    args:
+      chdir: "/var/cache/apt/archives/"
+
+- hosts: all
+  become: yes
+  gather_facts: no
+  vars:
+    vg_data_name: pgb
+    lv_data_name: data
+    raw_data_disks: /dev/sdb,/dev/sdc,/dev/sdd,/dev/sde
+    mnt_point: /pg/mnt
+    mnt_data: /pg/mnt/data
+    fs: ext4
+
+  tasks:
+  - name: Create the "{{ vg_data_name }}" Volume group.
+    lvg:
+      pvs: "{{ raw_data_disks }}"
+      vg: "{{ vg_data_name }}"
+      pesize: "8"
+      pv_options: '-Z y'
+      force: no
+      state: present
+
+  - name: Create the "{{ lv_data_name }}" Logical Volume.
+    lvol:
+      vg: "{{ vg_data_name }}"
+      lv: "{{ lv_data_name }}"
+      size: 900g
+      active: yes
+      force: no
+      opts: "--stripes 4 --stripesize 1024kB"
+      state: present
+
+  - name: Create a "{{ fs }}" filesystem on lvm "/dev/mapper/{{ vg_data_name }}-{{ lv_data_name }}".
+    filesystem:
+      fstype: "{{ fs }}"
+      dev: "/dev/mapper/{{ vg_data_name }}-{{ lv_data_name }}"
+      force: no
+
+  - name: Create a directory to mount the data filesystem.
+    file:
+      path: "{{ mnt_point }}"
+      state: directory
+      owner: postgres
+      group: postgres	
+      mode: '0755'
+
+  - name: Mount the created "{{ fs }}" filesystem.
+    mount:
+      path: "{{ mnt_point }}"
+      src: "/dev/mapper/{{ vg_data_name}}-{{ lv_data_name}}"
+      fstype: "{{ fs }}"
+      opts: rw,nosuid,noexec
+      state: mounted
+
+  - name: Create a directory for DB data.
+    file:
+      path: "{{ mnt_data }}"
+      state: directory
+      owner: postgres
+      group: postgres	
+      mode: '0755'
+
+  - name: Ensure permission for "{{ mnt_data }}".
+    file:
+      path: "{{ mnt_data }}"
+      state: directory
+      owner: postgres
+      group: postgres
+      mode: '0755'
+
+- hosts: all
+  become: yes
+  become_user: postgres
+  gather_facts: no
+
+  vars:
+    dbuser: nutanix
+    dbpassword: nutanix/4u
+    mnt_data: /pg/mnt/data
+
+  tasks:
+  - name: Stop DB service
+    command: /usr/lib/postgresql/9.5/bin/pg_ctl -D /var/lib/postgresql/9.5/main stop
+    register: pgctlout
+  - debug: msg="{{ pgctlout.stdout }}"
+
+  - name: InitDB to new data directory
+    command: /usr/lib/postgresql/9.5/bin/initdb "{{ mnt_data }}"
+    register: initout
+  - debug: msg="{{ initout.stdout }}"
+
+  - name: Start DB with new data directory
+    command: /usr/lib/postgresql/9.5/bin/pg_ctl -D "{{ mnt_data }}" start
+    register: pgctlout
+  - debug: msg="{{ pgctlout.stdout }}"
+
+  - name: Create test database
+    postgresql_db: name={{dbname}}
+
+  - name: Ensure user has access to database
+    postgresql_user: db={{dbname}} name={{dbuser}} password={{dbpassword}} priv=ALL
+
+- hosts: all
+  become: yes
+  become_user: nutanix
+  gather_facts: no
+
+  tasks:
+  - name: Prepare pgbench
+    shell: pgbench -i -s {{pgbench_scale}} {{dbname}}
+    register: pgbenchout
+  - debug: msg="{{ pgbenchout.stdout }}"
+
+

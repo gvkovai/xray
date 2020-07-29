@@ -1,0 +1,18 @@
+[global]
+ioengine=libaio
+direct=1
+norandommap
+group_reporting
+disk_util=0
+continue_on_error=all
+rate_process=poisson
+
+{% for di in "bcdefghijklmnopqrstuvwxyz"[:disk_count] %}
+[disk{{di}}]
+filename=/dev/sd{{di}}
+bs=1m
+size={{disk_size}}M
+rw=write
+rate_iops={{rate_iops}}
+iodepth={{iodepth}}
+{% endfor %}

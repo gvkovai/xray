@@ -1,0 +1,6 @@
+This folder contains files to get imported into x-ray instance as custom scenario. 
+This self contained package will enable all VMs have postgres SQL and 
+required packages installed to get pgbench result reported in X-Ray UI as well.
+
+Please download and add the following file to this package
+go1.12.7.linux-amd64.tar.gz

@@ -1,0 +1,233 @@
+name: pg_sql_bench_rolling_upgrade
+
+display_name: "Postgres SQL Benchmark with Rolling Upgrde"
+
+summary: |
+  Scalable, pgbench benchmark scenario distributing a workload
+  across VMs and simulate rolling upgrade scenario.
+
+description: |
+  <strong>What's this test about?</strong><br/>
+  This test allows for the pgbench execution on one or more virtual machines. 
+   Many pgbench benchmark parameters can be adjusted, including the scale, clients, 
+   jobs and the transactions. VMs will be evenly distributed across the nodes
+   in the cluster and pgbench is run in all the VMs using the given parameters.
+   In this version we use the "Simple" PGbench mode in which only the select transaction
+   types are executed.  By using only the simple transactions and a small workingset
+   this workload exercises CPU and memory.
+  <br/><br/>
+  <strong>How to measure the infrastructure's raw performance?</strong><br/>
+  The performance is evaluated by measuring the transactions, throughput and 
+  latency of the workload.
+  <br/><br/>
+  <strong>How is the test run?</strong><br/>
+  Setup
+  <ol>
+    <li>Deploy the desired number of workload VMs per host.</li>
+    <li>Run pgbench on each of the VM.</li>
+  </ol>
+  Measurement
+  <ol>
+    <li>Run the desired database transactions per pgbench client.</li>
+  </ol>
+
+
+tags:
+  - performance
+  - day_0
+
+vars:
+  AA_max_num_db_instances:
+    default: 4
+    display_name: "Max Number of DB instances"
+    min: 1
+  AC_vcpu_per_db:
+    default: 4
+    display_name: "vCPU per DB instance"
+    min: 2
+  B_pgbench_scale:
+    default: 2000
+    display_name: "Scale Factor"
+    min: 10
+  C_pgbench_clients:
+    default: 10
+    display_name: "Number of clients simulated, that is, number of concurrent database sessions"
+    min: 1
+  E_pgbench_jobs:
+    default: 10
+    display_name: "Number of worker threads within pgbench client"
+    min: 1
+  F_db_runtime:
+    default: 10800
+    display_name: "The duration for DB workload to run"
+    min: 1800
+  G_node_poweroff_duration:
+    default: 180
+    display_name: "The duration for each node to be powered off"
+    min: 1
+  num_nodes:
+    description: |
+      The number of nodes in the cluster to use for this test.
+      This value must not exceed the total number
+      of nodes in the cluster.
+    display_name: "Number of nodes in cluster"
+    default: 4
+    min: 1
+  B_vdi_vms_per_node:
+    description: |
+      Number of VDI VMs per node.
+    display_name: "Number of VDI VMs per node"
+    default: 5
+    min: 0
+  C_vdi_disks_per_vm:
+    description: |
+      The number of disks attached to each VM.
+    default: 6
+    display_name: "Number of disks attached to each VM"
+    min: 1
+    max: 25
+  D_vdi_datasize_per_node:
+    description: |
+      The VDI data size, in MB per node.
+    default: 2097152
+    display_name: "VDI Data size per node(MB)"
+    min: 0
+  E_vdi_prefill_throughput:
+    description: |
+      Speed at which prefill needs to be attempted in MB.
+    default: 300
+    display_name: "Throughput at which prefill to be attempted in MB per node"
+    min: 0
+
+estimated_runtime: 7200
+
+vms:
+  - pgvms:
+      template: ubuntu1604
+      vcpus: {{ AC_vcpu_per_db }}
+      ram_mb: 8192
+      data_disks:
+        count: 4
+        size: 256
+      count_per_cluster: {{ AA_max_num_db_instances }}
+      exporter_ports:
+        - 9100
+        - 9187
+  - VDI:
+      template: ubuntu1604
+      vcpus: 2
+      ram_mb: 2048
+      data_disks:
+        count: {{ C_vdi_disks_per_vm }}
+        size: {{ (D_vdi_datasize_per_node / (C_vdi_disks_per_vm * B_vdi_vms_per_node * 1024))| round(0, 'ceil') | int }}
+      count_per_node: {{ B_vdi_vms_per_node }}
+
+workloads:
+  - Custom VDI Prefill:
+      vm_group: VDI
+      config_file: vdi_prefill.fio
+      config_variables:
+        disk_size: {{ (D_vdi_datasize_per_node / (C_vdi_disks_per_vm * B_vdi_vms_per_node)) | int }}
+        disk_count: {{ C_vdi_disks_per_vm }}
+        rate_iops: {{ (E_vdi_prefill_throughput / (C_vdi_disks_per_vm * B_vdi_vms_per_node)) | int }}
+        iodepth: {{ (128 / (C_vdi_disks_per_vm * B_vdi_vms_per_node)) | int }}
+
+results: 
+  - "DB Transactions":
+      vm_group: pgvms
+      result_hint: "Higher transactions indicates better performance."
+      result_type: generic
+      query: |
+        irate(
+          pg_stat_database_xact_commit{
+            datname="xraypgb",
+            __curie_filter_scenario__,
+            __curie_filter_vm_group__
+          }
+        [30s]) + 
+        irate(
+          pg_stat_database_xact_rollback{
+            datname="xraypgb",
+            __curie_filter_scenario__,
+            __curie_filter_vm_group__
+          }
+        [30s])
+  - Cluster CPU Usage:
+      metric: CpuUsage.Avg.Megahertz
+      aggregate: sum
+  - Cluster Network Received:
+      metric: NetReceived.Avg.KilobytesPerSecond
+      aggregate: sum
+  - Cluster Network Transmitted:
+      metric: NetTransmitted.Avg.KilobytesPerSecond
+      aggregate: sum
+
+setup:
+  - cluster.CleanUp: {}
+  - vm_group.CloneFromTemplate:
+      vm_group_name: pgvms
+      disable_drs: False
+      disable_ha: False
+  - vm_group.CloneFromTemplate:
+      vm_group_name: VDI
+      disable_drs: False
+      disable_ha: False
+  - vm_group.PowerOn:
+      vm_group_name: pgvms
+  - vm_group.PowerOn:
+      vm_group_name: VDI
+  - playbook.Run:
+      filename: provision.yml
+      forks: 99
+      inventory:
+        - pgvms
+      variables:
+        dbname: xraypgb
+        pgbench_scale: {{ B_pgbench_scale }}
+      remote_user: root
+      remote_pass: nutanix/4u
+  - playbook.Run:
+      filename: setup_postgres_exporter.yml
+      forks: 99
+      inventory:
+        - pgvms
+      variables:
+        dbname: xraypgb
+      remote_user: root
+      remote_pass: nutanix/4u
+  - workload.Start:
+      workload_name: Custom VDI Prefill
+      timeout_secs: 28800
+
+run:
+  - playbook.Run:
+      filename: run-pgbench.yml
+      forks: 199
+      inventory:
+        - pgvms
+      variables:
+        dbname: xraypgb
+        pgbench_scale: {{ B_pgbench_scale }}
+        pgbench_clients: {{ C_pgbench_clients }}
+        pgbench_jobs: {{ E_pgbench_jobs }}
+        e_index: {{ AA_max_num_db_instances }}
+        pgbench_runtime: {{ F_db_runtime }}
+      remote_user: root
+      remote_pass: nutanix/4u
+      annotate: True
+  - test.Wait:
+      duration_secs: 900
+{% for node_index in range(num_nodes) %}
+  - nodes.EnterMaintenanceMode:
+      nodes: {{ node_index }}
+  - test.Wait:
+      duration_secs: {{ G_node_poweroff_duration }}
+  - nodes.ExitMaintenanceMode:
+      nodes: {{ node_index }}
+{% endfor %}
+  - test.Wait:
+      duration_secs: 900
+
+teardown:
+  - test.Wait:
+      duration_secs: 10

@@ -1,0 +1,10 @@
+- hosts: pgvms[0:{{e_index}}]
+  become: yes
+  become_user: nutanix
+  gather_facts: no
+
+  tasks:
+  - name: Run PGBench
+    shell: nohup pgbench -s {{pgbench_scale}} -c {{pgbench_clients}} -j {{pgbench_jobs}} -T {{pgbench_runtime}} {{dbname}} > /home/nutanix/pgbench.log 2>&1 &
+    register: pgbenchout
+  - debug: msg="{{ pgbenchout.stdout }}"
