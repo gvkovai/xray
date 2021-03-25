@@ -1,0 +1,8 @@
+---
+
+- hosts: cvms
+  gather_facts: no
+  tasks:
+    - name: cvm_get_snapshot_results 
+      shell: 'source /etc/profile; ssh $(cerebro_cli get_master_location 2>/dev/null | grep handle | cut -d : -f 2) grep Duration /home/nutanix/data/logs/cerebro.INFO > /tmp/cvm_get_snapshot_results.output.txt'
+      run_once: true

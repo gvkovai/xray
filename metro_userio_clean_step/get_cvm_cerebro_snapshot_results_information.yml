@@ -1,0 +1,8 @@
+---
+
+- hosts: cvms
+  gather_facts: no
+  tasks:
+    - name: get_cvm_cerebro_snapshot_results_information
+      shell: 'source /etc/profile;rm /tmp/get_cvm_cerebro_snapshot_results_information.output.txt; for i in $(svmips); do ssh $i "echo $hostname ;grep  Duration /home/nutanix/data/logs/cerebro.INFO | cat";done  > /tmp/get_cvm_cerebro_snapshot_results_information.output.txt'
+      run_once: false

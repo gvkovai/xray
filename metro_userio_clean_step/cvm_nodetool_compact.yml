@@ -1,0 +1,10 @@
+---
+
+- hosts: cvms
+  gather_facts: no
+  tasks:
+    - name: cvm_cassandra_nodetool_compact
+      shell: 'source /etc/profile; /usr/local/nutanix/apache-cassandra/bin/nodetool -h localhost compact'
+      async: 4000
+      poll: 60
+      run_once: false

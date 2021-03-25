@@ -1,0 +1,13 @@
+---
+
+- hosts: cvms
+  gather_facts: no
+  tasks:
+    - name: fetch_cvm_ncli_rs_ls.output.txt
+      run_once: True
+      fetch: 
+        src: "/tmp/cvm_ncli_rs_ls.output.txt" 
+        dest: "{{ output_directory }}/Artifacts/ncli_output/cvm_ncli_rs_ls.output.txt"
+        flat: yes
+        fail_on_missing: yes
+      when: hypervisor == "ahv"

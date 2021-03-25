@@ -1,0 +1,22 @@
+#
+# Copyright (c) 2018 Nutanix Inc. All rights reserved.
+#
+# Author: Brantley West (brantley@nutanix.com)
+#
+
+---
+
+- name: Set gflags for CVM services via /home/nutanix/config/_service_.gflags
+
+  hosts: cvms
+
+  vars:
+    #gflags: (example)
+    #  /home/nutanix/config/curator.gflags:
+    #    - name: '--curator_experimental_disable_dynamic_and_periodic_scans'
+    #      value: 'true'
+
+  tasks:
+    - name: ensure gflags are set correctly
+      template: src=gflag.j2 dest={{ item.key }}
+      with_dict: "{{ gflags }}"

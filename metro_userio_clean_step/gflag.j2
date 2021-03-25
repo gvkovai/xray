@@ -1,0 +1,19 @@
+{#
+
+Copyright (c) 2018 Nutanix Inc. All rights reserved.
+
+Author: Brantley West (brantley@nutanix.com)
+
+Purpose: Jinja template for setting service-related gflags.
+
+Use Jinja to populate gflags using the following example:
+
+    - name: '--curator_experimental_disable_dynamic_and_periodic_scans'
+      value: 'true'
+
+#}
+# Automatically configured via Goldfinger (au).
+
+{% for gflag in item.value %}
+{{ gflag.name }}={{ gflag.value }}
+{% endfor %}

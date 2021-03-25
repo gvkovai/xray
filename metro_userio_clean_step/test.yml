@@ -1,0 +1,423 @@
+name: METRO_UserIO_Clean_Step
+
+display_name: "METRO UserIO Clean Step"
+
+summary:
+  Data Protection Metro DR with Grafana Annotations - RBR
+
+description: |
+  <strong>What's this test about?</strong><br/>
+  Disaster Recovery - Protection Domain - Metro DR
+  Iterations:
+  <br/><br/>
+  <br/><br/>
+  <strong>How to measure the impact of Compression on Wire on snapshots?</strong><br/>
+  <br/><br/>
+  <strong>How is the test run?</strong><br/>
+  Setup
+  <ol>
+    <li> Cluster stop.  Modify GFLAGS.  Cluster start.</li>
+    <li> Deploy the VM template. </li>
+    <li> Pre-fill the VM(s). </li>
+    <li> Create Protection Domain </li>
+    <li> Take Snapshot </li>
+    <li> Take measurements </li>
+  </ol>
+  Measurement
+  <ol>
+        <li>replicated_bytes</li>
+        <li>tx_bytes</li>
+        <li>uncompressed_tx_bytes</li>
+        <li>Duration</li>
+  </ol>
+  Test Requirements
+  <ul class="indented">
+    <li>vCPUs: 4 vCPUs per VM</li>
+    <li>RAM: 4 GB per VM</li>
+    <li>IP Addresses: 1 per VM</li>
+  </ul>
+
+tags:
+  - performance
+
+presets:
+  random_writes:
+    vars:
+      _preset_name: "Random Writes"
+      A_vms_per_node: 1
+      B_disks_per_vm: 8
+      D_read_percent: 0
+      E_random_percent: 100
+      F_iodepth: 16
+      G_block_size: 8192
+      H_target_rate: 20000
+      I_runtime: 1800
+      K_steps: 5
+      L_pd_name_prefix: "random_writes"
+      N_start_trate: 4000
+  sequential_writes:
+    vars:
+      _preset_name: "Sequential Writes"
+      A_vms_per_node: 1
+      B_disks_per_vm: 8
+      D_read_percent: 0
+      E_random_percent: 0
+      F_iodepth: 16
+      G_block_size: 1048576
+      H_target_rate: 300
+      I_runtime: 1800
+      K_steps: 5
+      L_pd_name_prefix: "sequential_writes"
+      N_start_trate: 60
+
+vars:
+  A_vms_per_node:
+    display_name: "vms_per_node"
+    default: 1
+    min: 1
+    max: 4
+  B_disks_per_vm:
+    description: |
+      The number of disks attached to each VM.
+    default: 8
+    display_name: "Number of disks attached to each VM"
+    min: 1
+    max: 16
+  C_vm_wss:
+    description: |
+      The VM working set size in megabytes.
+      The working set size is a measurement of how much
+      disk data the application is operating on for the duration of the test.
+    default: 196608
+    display_name: "VM working set size (MB)"
+    min: 200
+  D_read_percent:
+    description: |
+      The workload read percent.
+      Setting read percent to 0 results in full writes.
+      Setting read percent to 100 results in full reads.
+    default: 50
+    display_name: "Workload read percent"
+    min: 0
+    max: 100
+  E_random_percent:
+    description: |
+      The workload random percent.
+      Setting random percent to 0 results in a fully sequential I/O workload.
+      Setting random percent to 100 results in a fully random I/O
+      workload.
+    default: 50
+    display_name: "Workload random percent"
+    min: 0
+    max: 100
+  F_iodepth:
+    description: |
+      The number of I/O operations left outstanding per disk.
+    default: 16
+    display_name: "Number of I/O operations left outstanding per disk"
+    min: 1
+  G_block_size:
+    description: |
+      The workload block size in bytes.
+    default: 8192
+    display_name: "Workload block size in bytes"
+    min: 512
+  H_target_rate:
+    description: |
+      The target IOPS rate per VM (0 for unlimited).
+    default: 0
+    display_name: "Target IOPS rate per VM (0 for unlimited)"
+    min: 0
+  I_runtime:
+    description: |
+      The workload runtime in seconds.
+    default: 900
+    display_name: "Runtime in seconds"
+    min: 60
+  J_num_nodes:
+    description: |
+      Number of nodes in the cluster.
+    default: 4
+    display_name: "Number of nodes in the cluster"
+    min: 4
+  K_steps:
+    description: |
+      Number of run steps
+    default: 5
+    display_name: "Number of run steps"
+  L_pd_name_prefix:
+    description: |
+      Prefix for protection domain name.
+    default: "pd_name_prefix"
+    display_name: "Prefix for protection domain name"
+  M_wait4oplogdrain:
+    description: |
+      Min time to wait for oplog to be drained
+    default: 10
+    display_name: "Time to wait for oplog to be drained"
+    min: 0
+  N_start_trate:
+    description: |
+      Starting target rate
+    default: 4000
+    display_name: "Starting target rate"
+  set_gflags:
+    description: |
+      Do you want to set gflags?
+    default: true
+    display_name: "Do you want to set gflags?"
+  grpc_num_cqs:
+    description: |
+      rpc_server_v2_grpc_num_cqs
+    default: 1
+    display_name: "rpc_server_v2_grpc_num_cqs"
+  number_of_curator_scans:
+    display_name: "Number of Curator Scans"
+    default: 3
+    min: 1
+    max: 9
+  cluster_cleanup:
+    description: |
+      Determines whether to call the cluster.Cleanup step.
+      Do not select if you want existing X-Ray UVMs to be left on the cluster.
+    display_name: "Call cluster.Cleanup"
+    default: true 
+
+{% set H_target_rate = H_target_rate|int %}
+{% set N_start_trate = N_start_trate|int %}
+{% set M_wait4oplogdrain = M_wait4oplogdrain |int %}
+
+{% if H_target_rate > 0 %}
+
+{% if M_wait4oplogdrain > 0 %}
+estimated_runtime: {{ (H_target_rate/K_steps)*I_runtime + (H_target_rate/K_steps)*M_wait4oplogdrain + 3600 }}
+{% else %}
+estimated_runtime: {{ (H_target_rate/K_steps)*I_runtime + 3600 }}
+{% endif %}
+
+{% else %}
+estimated_runtime: {{ I_runtime + 3600 }}
+{% endif %}
+
+
+vms:
+  - group_0:
+      template: ubuntu1604
+      vcpus: 4
+      ram_mb: 4096
+      data_disks:
+        count: {{ B_disks_per_vm }}
+        size: 512
+      nodes: all
+      count_per_node: {{ A_vms_per_node }}
+
+workloads:
+  - Custom Workload Prefill:
+      vm_group: group_0
+      config_file: custom.fio
+      config_variables:
+        disk_size: {{ (C_vm_wss / B_disks_per_vm) | int }}
+        disk_count: {{ B_disks_per_vm }}
+        read_percent: 0
+        random_percent: 0
+        iodepth: {{ (128 / B_disks_per_vm) | int }}
+        block_size: 1m
+{% if H_target_rate > 0 %}
+{% for s_target_rate in range(N_start_trate, H_target_rate+K_steps, K_steps) %}
+  - {{ s_target_rate }} IOPS:
+      vm_group: group_0
+      config_file: custom.fio
+      config_variables:
+        disk_size: {{ (C_vm_wss / B_disks_per_vm) | int }}
+        disk_count: {{ B_disks_per_vm }}
+        read_percent: {{ D_read_percent }}
+        random_percent: {{ E_random_percent }}
+        iodepth: {{ F_iodepth }}
+        block_size: {{ G_block_size }}
+        target_rate: {{ s_target_rate }}
+{% endfor %}
+{% endif %}
+  - Unlimited IOPS:
+      vm_group: group_0
+      config_file: custom.fio
+      config_variables:
+        disk_size: {{ (C_vm_wss / B_disks_per_vm) | int }}
+        disk_count: {{ B_disks_per_vm }}
+        read_percent: {{ D_read_percent }}
+        random_percent: {{ E_random_percent }}
+        iodepth: {{ F_iodepth }}
+        block_size: {{ G_block_size }}
+        target_rate: 0
+
+results:
+  - Workload Aggregated IOPS:
+      vm_group: group_0
+      result_type: iops
+      aggregate: sum
+      report_group: performance
+      report_metrics:
+        - Median
+      result_hint: "Higher IOPS indicates better performance."
+  - Workload Aggregated Latency:
+      vm_group: group_0
+      result_type: latency
+      result_hint: "Lower latency indicates better performance."
+      report_group: performance
+      aggregate: sum
+      report_metrics:
+        - Median
+  - Cluster CPU Usage:
+      metric: CpuUsage.Avg.Megahertz
+      aggregate: sum
+  - Cluster Network Received:
+      metric: NetReceived.Avg.KilobytesPerSecond
+      aggregate: sum
+  - Cluster Network Transmitted:
+      metric: NetTransmitted.Avg.KilobytesPerSecond
+      aggregate: sum
+
+
+setup:
+  ## Remove known hosts file. Fixes failure of Ansible to ssh to CVMs/Hosts after foundation of a previously tested cluster.
+  - experimental.Shell:
+      cmd: rm -f /root/.ssh/known_hosts
+  ## Clean up X-ray obects (UVMs, gold images)
+  {% if cluster_cleanup == true %}
+  - cluster.CleanUp: {}
+  {% endif %}
+  - test.Wait: {duration_secs: 10}
+
+  {% if set_gflags == true %}
+
+  - playbook.Run:
+      filename: cvm_cluster_stop.yml
+      inventory:
+        - cvms
+      remote_user: nutanix
+      remote_pass: nutanix/4u
+
+  - test.Wait:
+      duration_secs: 30
+
+  # Disable periodic curator scans and set required gflags
+  - playbook.Run:
+     filename: cvm_gflag_set.yml
+     inventory:
+       - cvms
+     remote_user: nutanix
+     remote_pass: nutanix/4u
+     variables:
+       gflags:
+         /home/nutanix/config/curator.gflags:
+           - name: "--curator_experimental_disable_dynamic_and_periodic_scans"
+             value: "true"
+         /home/nutanix/config/stargate.gflags:
+           - name: "--rpc_server_v2_grpc_num_cqs"
+             value: {{ grpc_num_cqs }}
+
+  - playbook.Run:
+      filename: cvm_cluster_start.yml
+      inventory:
+        - cvms
+      remote_user: nutanix
+      remote_pass: nutanix/4u
+
+  - test.Wait:
+      duration_secs: 30 
+  {% endif %}
+
+{% for curator_scan_index in range(number_of_curator_scans) %}
+  ## Clean up storage with curator scan 
+  - playbook.Run:
+      filename: cvm_start_curator_scan_full.yml
+      inventory: [cvms]
+      remote_pass: nutanix/4u
+      remote_user: nutanix
+  - test.Wait: {duration_secs: 10}
+  ## Wait for chronos jobs to be completed
+  - playbook.Run:
+      filename: cvm_wait_chronos_jobs_zero.yml
+      inventory: [cvms]
+      remote_pass: nutanix/4u
+      remote_user: nutanix
+  - test.Wait: {duration_secs: 10}
+  # Run nodetool compaction to clean up metadata 
+  - playbook.Run:
+      filename: cvm_nodetool_compact.yml
+      inventory:
+        - cvms
+      remote_user: nutanix
+      remote_pass: nutanix/4u
+{% endfor %}
+
+# Run fstrim on all CVMs
+  - playbook.Run:
+      filename: fstrim.yml
+      inventory:
+        - cvms
+      remote_user: nutanix
+      remote_pass: nutanix/4u
+
+  - vm_group.CloneFromTemplate:
+      vm_group_name: group_0
+
+  - vm_group.PowerOn:
+      vm_group_name: group_0
+
+  - test.Wait:
+      duration_secs: 60
+
+  - workload.PrefillRun:
+      workload_name: Custom Workload Prefill
+
+# Wait for counters to stabilize before entering test setup phase.
+# due to high CPU in metro config, let's wait for 2 mins before
+# entering run phase (to avoid ssh failures for upcoming playbooks
+  - test.Wait:
+      duration_secs: 120 
+
+run:
+{% if H_target_rate > 0 %}
+{% for s_target_rate in range(N_start_trate, H_target_rate+K_steps, (H_target_rate/K_steps)|int) %}
+  - experimental.Shell:
+      cmd: rm -f /root/.ssh/known_hosts
+
+{% if M_wait4oplogdrain > 0 %}
+  - playbook.Run:
+      filename: wait_oplog_empty.yml
+      inventory:
+        - cvms
+      variables:
+        timeout_secs: {{ M_wait4oplogdrain }}
+      remote_user: nutanix
+      remote_pass: nutanix/4u
+{% endif %}
+  - workload.Start:
+      workload_name: {{ s_target_rate }} IOPS
+      runtime_secs: {{ I_runtime }}
+      annotate: True
+{% endfor %}
+{% endif %}
+
+  - experimental.Shell:
+      cmd: rm -f /root/.ssh/known_hosts
+
+{% if M_wait4oplogdrain > 0 %}
+  - playbook.Run:
+      filename: wait_oplog_empty.yml
+      inventory:
+        - cvms
+      variables:
+        timeout_secs: {{ M_wait4oplogdrain }}
+      remote_user: nutanix
+      remote_pass: nutanix/4u
+{% endif %}
+  - workload.Start:
+      workload_name: Unlimited IOPS
+      runtime_secs: {{ I_runtime }}
+      annotate: True
+
+teardown:
+
+  - test.Wait:
+      duration_secs: 3 

@@ -1,0 +1,12 @@
+- hosts: all
+  become: yes
+  become_user: root
+  gather_facts: no
+
+  tasks:
+  - name: Run - Protect VMs
+    local_action: command python protect_vms.py --user {{ user }} --passwd {{ passwd }} --pcip {{ pcip }} --prrule {{ prrule }}
+    register: prruleout
+    run_once: true
+  - debug: msg="Disk ID to be failed {{ prruleout.stdout }}"  
+ 

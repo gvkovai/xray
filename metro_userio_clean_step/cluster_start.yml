@@ -1,0 +1,17 @@
+#
+# Copyright (c) 2018 Nutanix Inc. All rights reserved.
+#
+# Author: Brantley West (brantley@nutanix.com)
+#
+
+---
+
+- name: cluster start
+
+  hosts: cvms
+
+  tasks:
+    - name: cluster start
+      shell: 'source /etc/profile.d/zookeeper_env.sh ; /usr/local/nutanix/cluster/bin/cluster start'
+      run_once: true
+

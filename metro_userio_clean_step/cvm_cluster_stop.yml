@@ -1,0 +1,8 @@
+---
+
+- hosts: cvms
+  gather_facts: no
+  tasks:
+    - name: cluster stop
+      shell: 'source /etc/profile.d/zookeeper_env.sh ; echo I agree | /usr/local/nutanix/cluster/bin/cluster stop'
+      run_once: true

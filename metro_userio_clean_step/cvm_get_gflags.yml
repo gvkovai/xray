@@ -1,0 +1,23 @@
+---
+
+- name: get gflags
+  hosts: cvms
+  vars:
+    gflags:
+     - { port: 2009 }
+     - { port: 2010 }
+     - { port: 2011 }
+     - { port: 2012 }
+     - { port: 2014 }
+     - { port: 2016 }
+     - { port: 2019 }
+     - { port: 2020 }
+     - { port: 2030 }
+     - { port: 2040 }
+    #gflag_dest: '/home/cbwest'
+  tasks:
+    - name: get gflags
+      get_url: dest="{{ gflag_dest }}/{{ ansible_default_ipv4.address }}_{{ item.port }}.gflag.txt" url="http://{{ ansible_default_ipv4.address }}:{{ item.port }}/h/gflags"
+      with_items: "{{ gflags }}"
+      ignore_errors: yes
+      connection: local

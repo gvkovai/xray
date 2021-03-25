@@ -1,0 +1,7 @@
+- name: wait for Oplog to be empty for {{ timeout_secs }} seconds
+  hosts: all
+
+  tasks:
+   - name: wait for Oplog to be empty for {{ timeout_secs }} seconds
+     script: wait_oplog_empty.sh {{ timeout_secs }}
+

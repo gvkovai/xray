@@ -1,0 +1,39 @@
+---
+
+- hosts: cvms
+  vars:
+    restart_services: True
+    #gflags:
+    #  - { service: 'curator', path: '/home/nutanix/config/curator.gflags', name: '--curator_experimental_disable_dynamic_and_periodic_scans', value: 'true' }
+    #  - { service: 'curator', path: '/home/nutanix/config/curator.gflags', name: '--curator_tier_usage_ilm_threshold_percent', value: '90' }
+    #  - { service: 'stargate', path: '/home/nutanix/config/stargate.gflags', name: '--vdisk_distributed_oplog_max_dirty_MB', value: 2048 }
+  tasks:
+    - name: remove old gflags
+      file: state=absent path={{ item.path }}
+      with_items: "{{ gflags }}"
+      notify: restart service
+      tags:
+        - gflags
+    - name: apply gflags
+      lineinfile:
+        state: present
+        create: true
+        dest: "{{ item.path }}"
+        line: "{{ item.name }}={{ item.value }}"
+      with_items: "{{ gflags }}"
+      notify: restart service
+      tags:
+        - gflags
+  handlers:
+    - name: restart service
+      shell: '/usr/local/nutanix/cluster/bin/genesis stop {{ item.service }}'
+      notify: restart genesis 
+      with_items: "{{ gflags }}"
+      when: restart_services
+    - name: restart genesis
+      shell: '/usr/local/nutanix/cluster/bin/genesis restart'
+      notify: cluster start
+      when: restart_services
+    - name: cluster start
+      shell: '/usr/local/nutanix/cluster/bin/cluster start'
+      when: restart_services

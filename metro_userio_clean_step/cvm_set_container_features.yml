@@ -1,0 +1,15 @@
+---
+
+- name: Set NOS cluster storage container features 
+  hosts: cvms
+  gather_facts: no
+  tasks:
+    - debug:
+        var: enable_compression 
+        verbosity: 3
+    - debug:
+        var: fingerprint_on_write 
+        verbosity: 3
+    - name: Set up container features 
+      command: '/home/nutanix/prism/cli/ncli container edit name={{storage_container_name}} enable-compression={{enable_compression}} fingerprint-on-write={{fingerprint_on_write}} on-disk-dedup={{on_disk_dedup}} enable-software-encryption={{enable_software_encryption}}'
+      run_once: true
