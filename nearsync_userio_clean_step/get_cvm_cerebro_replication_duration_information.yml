@@ -1,0 +1,8 @@
+---
+
+- hosts: cvms
+  gather_facts: no
+  tasks:
+    - name: get_cvm_cerebro_replication_duration_information
+      shell: 'source /etc/profile;rm /tmp/get_cvm_cerebro_replication_duration_information.output.txt; for i in $(svmips); do ssh $i "echo $hostname ;sed -rne \"/$(date -u -d -{{ log_interval }}min +"%Y%m%d %H:%M")/,/$(date -u +"%Y%m%d %H:%M")/ p\" /home/nutanix/data/logs/cerebro.INFO | grep  Duration | cat";done  > /tmp/get_cvm_cerebro_replication_duration_information.output.txt'
+      run_once: false

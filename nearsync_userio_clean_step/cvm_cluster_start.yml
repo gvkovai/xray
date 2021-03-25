@@ -1,0 +1,8 @@
+---
+
+- hosts: cvms
+  gather_facts: no
+  tasks:
+    - name: cluster start
+      shell: 'source /etc/profile.d/zookeeper_env.sh ; /usr/local/nutanix/cluster/bin/cluster start'
+      run_once: true

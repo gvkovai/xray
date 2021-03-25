@@ -1,0 +1,12 @@
+- hosts: all
+  become: yes
+  become_user: root
+  gather_facts: no
+
+  tasks:
+  - name: Create PD schedule
+    local_action: command python create_pd_schedule.py --user {{ user }} --passwd {{ passwd }} --pgip {{ pgip }} --pdname {{ pdname }} --stype {{ stype }} --nth {{ nth }} --remote {{ remote }}
+    register: pdout
+    run_once: true
+  - debug: msg="Protect VMs {{ pdout.stdout }}"  
+ 

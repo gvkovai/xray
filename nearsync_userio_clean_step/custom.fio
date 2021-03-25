@@ -1,0 +1,24 @@
+[global]
+ioengine=libaio
+direct=1
+time_based
+norandommap
+group_reporting
+disk_util=0
+continue_on_error=all
+
+{% for di in "bcdefghijklmnopqrstuvwxyz"[:disk_count] %}
+[disk{{di}}]
+bs={{block_size}}
+filename=/dev/sd{{di}}
+iodepth={{iodepth}}
+size={{disk_size}}M
+
+percentage_random={{random_percent}}
+rw=randrw
+{% if target_rate is defined %}
+rate_iops={{ ((target_rate / disk_count) * (read_percent/100)) | int}},{{ ((target_rate / disk_count) * (1-(read_percent/100))) | int}}
+{% endif %}
+rwmixread={{read_percent}}
+
+{% endfor %}

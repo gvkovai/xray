@@ -1,0 +1,7 @@
+- name: wait for near sync active for {{ timeout_secs }} seconds
+  hosts: all
+
+  tasks:
+   - name: wait for near sync active for {{ timeout_secs }} seconds
+     script: wait_for_nearsync.sh {{ pdname }} {{ timeout_secs }}
+

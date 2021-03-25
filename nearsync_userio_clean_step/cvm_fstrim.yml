@@ -1,0 +1,7 @@
+---
+- hosts: cvms
+  gather_facts: no
+  tasks:
+    - name: run fstrim on SSDs
+      become: yes
+      shell: "SSDS=(`lsblk -Dd | awk '{if ( $5 == 1 && $1 !~ /loop/) { print $1; }}'`) ; for SSD in \"${SSDS[@]}\" ; do echo -n Running fstrim on $SSD at `date`  ... ; mount | grep $SSD | awk '{print $3;}' | xargs sudo fstrim ; echo \" done at `date`\" ; done"

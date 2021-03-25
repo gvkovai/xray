@@ -1,0 +1,12 @@
+- hosts: all
+  become: yes
+  become_user: root
+  gather_facts: no
+
+  tasks:
+  - name: Delete PD schedule
+    local_action: command python delete_pd_schedule.py --user {{ user }} --passwd {{ passwd }} --pgip {{ pgip }} --pdname {{ pdname }}
+    register: pdout
+    run_once: true
+  - debug: msg="Protect VMs {{ pdout.stdout }}"  
+ 

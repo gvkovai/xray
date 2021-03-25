@@ -1,0 +1,8 @@
+---
+
+- hosts: cvms
+  gather_facts: no
+  tasks:
+    - name: cvm_ncli_rs_ls 
+      shell: 'source /etc/profile; /home/nutanix/prism/cli/ncli rs ls > /tmp/cvm_ncli_rs_ls.output.txt'
+      run_once: true

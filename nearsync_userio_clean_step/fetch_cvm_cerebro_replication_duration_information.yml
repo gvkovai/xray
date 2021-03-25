@@ -1,0 +1,13 @@
+---
+
+- hosts: cvms
+  gather_facts: no
+  tasks:
+    - name: fetch_cvm_cerebro_replication_duration_information
+      run_once: True
+      fetch: 
+        src: "/tmp/get_cvm_cerebro_replication_duration_information.output.txt" 
+        dest: "{{ output_directory }}/Artifacts/replication_duration.output.{{ iteration }}.txt"
+        flat: yes
+        fail_on_missing: yes
+      when: hypervisor == "ahv"

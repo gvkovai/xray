@@ -1,0 +1,12 @@
+- hosts: all
+  become: yes
+  become_user: root
+  gather_facts: no
+
+  tasks:
+  - name: Run - Wait for replications
+    local_action: command python wait_pd_replications.py --user {{ user }} --passwd {{ passwd }} --pgip {{ pgip }} --pdname {{ pdname }} --wtime {{ wtime }}
+    register: pdout
+    run_once: true
+  - debug: msg="Wait for replications to complete {{ pdout.stdout }}"  
+ 

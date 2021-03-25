@@ -1,0 +1,19 @@
+#
+# Copyright (c) 2018 Nutanix Inc. All rights reserved.
+#
+# Author: Brantley West (brantley@nutanix.com)
+# Modified for stargate by Hemant Belbase (hemant.belbase@nutanix.com)
+
+---
+
+- name: stargate stop
+
+  hosts: cvms 
+
+  tasks:
+     - name: stargate kill
+       command: /usr/bin/pkill stargate
+
+     - name: cluster status
+       shell: 'source /etc/profile.d/zookeeper_env.sh ; /usr/local/nutanix/cluster/bin/cluster status'
+       run_once: true

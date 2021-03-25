@@ -1,0 +1,9 @@
+- name: wait for Oplog/LWS to be empty for {{ timeout_secs }} seconds
+  hosts: all
+
+  tasks:
+   - name: wait for Oplog/LWS to be empty for {{ timeout_secs }} seconds
+     local_action: command python wait_oplog_lws_empty.py --cvms {{ target_cvms }} --timeout {{ timeout_secs }} --wtime {{ wait_time }}
+     register: pdout
+     run_once: true
+   - debug: msg="Wait for Oplog/LWS to be empty {{ pdout.stdout }}"  

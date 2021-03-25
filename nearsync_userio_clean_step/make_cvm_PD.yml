@@ -1,0 +1,66 @@
+---
+
+- hosts: cvms
+  gather_facts: no
+  tasks:
+    - debug:
+        var: pd_name 
+        verbosity: 3
+    - debug:
+        var: uvm_name_pattern 
+        verbosity: 3
+#   - name: create protection domain 
+#     command: '/home/nutanix/prism/cli/ncli protection-domain create name={{ PD_options.pd_name }}'
+#     run_once: true
+#     register: ncli_result
+#     until: "'Error' not in ncli_result.stdout"
+#     retries: 3
+#     delay: 1
+    - name: Get UVM names 
+      shell: "~/prism/cli/ncli  vm list | grep {{ PD_options.uvm_name_pattern }} | awk -F': ' '{print $2}'"
+      run_once: true
+      register: uvm_names
+
+#   - name: Add UVMs to Protection Domain 
+#     command: '/home/nutanix/prism/cli/ncli protection-domain protect vm-names={{ item }} name={{ PD_options.pd_name }}'
+#     run_once: true
+#     with_items: "{{ uvm_names.stdout_lines }}"
+#     delay: 1
+
+    - name: Get PD Remote Site Settings
+      shell: "cat /tmp/cvm_ncli_rs_ls.output.txt | grep Compression | awk -F': ' '{print $2}'"
+      run_once: True
+      register: ncli_rs_ls_CoW_value
+
+    - name: set ncli_rs_ls_CoW_value
+      set_fact: ncli_rs_ls_CoW_value={{ ncli_rs_ls_CoW_value.stdout }}
+      run_once:  True
+
+    - name: Test ncli_rs_ls_CoW_value 
+      command: '/usr/bin/echo {{ ncli_rs_ls_CoW_value }} > /tmp/PD_compression_value'
+      run_once: True
+
+    - name: create protection domain
+      command: '/home/nutanix/prism/cli/ncli protection-domain create name={{ PD_options.pd_name }}_CoW_{{ ncli_rs_ls_CoW_value }}'
+      run_once: true
+      register: ncli_result
+      until: "'Error' not in ncli_result.stdout"
+      retries: 3
+      delay: 1
+
+    - name: Add UVMs to Protection Domain
+      command: '/home/nutanix/prism/cli/ncli protection-domain protect vm-names={{ item }} name={{ PD_options.pd_name }}_CoW_{{ ncli_rs_ls_CoW_value }}'
+      run_once: true
+      with_items: "{{ uvm_names.stdout_lines }}"
+      delay: 1
+
+    - name: Create schedule
+      command: /home/nutanix/prism/cli/ncli protection-domain add-minutely-schedule name={{ PD_options.pd_name }}_CoW_{{ ncli_rs_ls_CoW_value }} every-nth-minute={{ PD_options.replication_interval }} local-retention=1 remote-retention={{ PD_options.RemoteSiteName }}:1 local-retention-type=DAYS remote-retention-type={{ PD_options.RemoteSiteName }}:DAYS
+      run_once: true
+      delay: 1
+      register: ncli_result
+
+    - name: sleep for 120 seconds and continue with playbook
+      wait_for:
+        timeout: 120 
+      delegate_to: localhost

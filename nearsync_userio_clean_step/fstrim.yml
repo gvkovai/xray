@@ -1,0 +1,16 @@
+#
+# Copyright (c) 2018 Nutanix Inc. All rights reserved.
+#
+# Author: Brantley West (brantley@nutanix.com)
+#
+
+---
+
+- name: run fstrim on all flash devices in parallel
+
+  hosts: all
+
+  tasks:
+    - name: run fstrim on SSD and NVMe devices
+      become: true
+      script: fstrim_EXT4flashdevices.sh 
